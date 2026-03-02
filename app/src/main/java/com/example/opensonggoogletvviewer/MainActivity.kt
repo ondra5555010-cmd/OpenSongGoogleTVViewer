@@ -6,6 +6,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.lifecycleScope
 import androidx.tv.material3.ExperimentalTvMaterial3Api
@@ -21,7 +22,7 @@ import okhttp3.OkHttpClient
 class MainActivity : ComponentActivity() {
 
     // TODO: move to settings later
-    private val presetIp = "192.168.0.153"
+    private val presetIp = "10.13.137.138"
     private val port = 8082
 
     @RequiresApi(Build.VERSION_CODES.O)
@@ -29,20 +30,17 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Shared HTTP client
         val okHttpClient = OkHttpClient.Builder()
             .connectTimeout(java.time.Duration.ofMillis(800))
             .readTimeout(java.time.Duration.ofSeconds(2))
             .callTimeout(java.time.Duration.ofSeconds(2))
-            .pingInterval(java.time.Duration.ofSeconds(15)) // keeps WS alive
+            .pingInterval(java.time.Duration.ofSeconds(15))
             .retryOnConnectionFailure(true)
             .build()
 
-        // Network layer
         val httpClient = OpenSongHttpClient(okHttpClient, presetIp, port)
         val wsClient = OpenSongWsClient(okHttpClient, presetIp, port)
 
-        // Repository
         val repository = OpenSongRepository(
             http = httpClient,
             ws = wsClient,
@@ -51,10 +49,8 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             OpenSongGoogleTVViewerTheme {
-                Surface(
-                    modifier = Modifier.fillMaxSize()
-                ) {
-                    val vm = SlideViewModel(repository)
+                Surface(modifier = Modifier.fillMaxSize()) {
+                    val vm = remember { SlideViewModel(repository) }
                     SlideScreen(vm)
                 }
             }

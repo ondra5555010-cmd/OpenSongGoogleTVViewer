@@ -2,6 +2,9 @@ package com.example.opensonggoogletvviewer.network
 
 import okhttp3.*
 import okio.ByteString
+import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
 class OpenSongWsClient(
@@ -12,9 +15,11 @@ class OpenSongWsClient(
     private var ws: WebSocket? = null
     private val connected = AtomicBoolean(false)
 
-    @Volatile private var reconnecting = false
     @Volatile private var shouldStayConnected = false
+    private val scheduler = Executors.newSingleThreadScheduledExecutor()
+    @Volatile private var reconnectTask: ScheduledFuture<*>? = null
 
+    @Synchronized
     fun connect(
         onPresentationEvent: () -> Unit,
         onError: (Throwable) -> Unit
@@ -22,7 +27,9 @@ class OpenSongWsClient(
         shouldStayConnected = true
         if (connected.get()) return
 
-        reconnecting = false
+        // If an old socket exists, close it before creating a new one.
+        ws?.close(1000, "reconnect")
+        ws = null
 
         val request = Request.Builder()
             .url("ws://$host:$port/ws")
@@ -36,10 +43,13 @@ class OpenSongWsClient(
 
             override fun onOpen(webSocket: WebSocket, response: Response) {
                 connected.set(true)
-                reconnecting = false
+                cancelReconnect()
 
+                // OpenSong subscribe
                 webSocket.send("/ws/subscribe/presentation")
-                onPresentationEvent() // refresh on connect
+
+                // Refresh immediately after subscribing
+                onPresentationEvent()
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {
@@ -50,50 +60,52 @@ class OpenSongWsClient(
                 onPresentationEvent()
             }
 
-            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+            override fun onClosing(webSocket: WebSocket, code: Int, reason: String) {
                 connected.set(false)
-                onError(t)
-                scheduleReconnect(onPresentationEvent, onError)
+                webSocket.close(code, reason)
             }
 
             override fun onClosed(webSocket: WebSocket, code: Int, reason: String) {
                 connected.set(false)
                 scheduleReconnect(onPresentationEvent, onError)
             }
+
+            override fun onFailure(webSocket: WebSocket, t: Throwable, response: Response?) {
+                connected.set(false)
+                onError(t)
+                scheduleReconnect(onPresentationEvent, onError)
+            }
         })
     }
 
+    @Synchronized
     private fun scheduleReconnect(
         onPresentationEvent: () -> Unit,
         onError: (Throwable) -> Unit
     ) {
         if (!shouldStayConnected) return
-        if (reconnecting) return
-        reconnecting = true
+        if (reconnectTask?.isDone == false) return
 
-        Thread {
-            try {
-                Thread.sleep(2000)
-            } catch (_: InterruptedException) {
-                return@Thread
-            }
-
-            if (!shouldStayConnected) {
-                reconnecting = false
-                return@Thread
-            }
-
+        reconnectTask = scheduler.schedule({
+            if (!shouldStayConnected) return@schedule
             connected.set(false)
             connect(onPresentationEvent, onError)
-        }.start()
+        }, 2, TimeUnit.SECONDS)
+    }
+
+    @Synchronized
+    private fun cancelReconnect() {
+        reconnectTask?.cancel(false)
+        reconnectTask = null
     }
 
     /**
      * Intentional close (background / user leaves). Disables auto-reconnect.
      */
+    @Synchronized
     fun close() {
         shouldStayConnected = false
-        reconnecting = false
+        cancelReconnect()
         ws?.close(1000, "closing")
         ws = null
         connected.set(false)

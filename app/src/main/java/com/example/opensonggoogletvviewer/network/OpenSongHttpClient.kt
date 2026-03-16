@@ -5,6 +5,8 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 
+class NoPresentationRunningException(message: String) : RuntimeException(message)
+
 class OpenSongHttpClient(
     private val client: OkHttpClient,
     private val host: String,
@@ -14,8 +16,6 @@ class OpenSongHttpClient(
     private fun buildRequest(url: String): Request {
         return Request.Builder()
             .url(url)
-
-            // --- Important for OpenSong (prevents HTTP 403) ---
             .addHeader(
                 "User-Agent",
                 "Mozilla/5.0 (Android TV; Linux; Android 12) AppleWebKit/537.36 Chrome/120 Safari/537.36"
@@ -23,7 +23,6 @@ class OpenSongHttpClient(
             .addHeader("Accept", "text/xml,application/xml,text/html;q=0.9,*/*;q=0.8")
             .addHeader("Connection", "keep-alive")
             .addHeader("Cache-Control", "no-cache")
-
             .get()
             .build()
     }
@@ -36,7 +35,13 @@ class OpenSongHttpClient(
             val body = resp.body?.string() ?: ""
 
             if (!resp.isSuccessful) {
-                // this helps debugging a LOT with OpenSong
+                if (
+                    resp.code == 403 &&
+                    body.contains("There is no running presentation", ignoreCase = true)
+                ) {
+                    throw NoPresentationRunningException(body)
+                }
+
                 throw RuntimeException("HTTP ${resp.code}\n$body")
             }
 

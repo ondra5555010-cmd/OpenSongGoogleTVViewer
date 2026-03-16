@@ -2,6 +2,7 @@ package com.example.opensonggoogletvviewer.data
 
 import com.example.opensonggoogletvviewer.model.ConnectionState
 import com.example.opensonggoogletvviewer.model.CurrentSlide
+import com.example.opensonggoogletvviewer.network.NoPresentationRunningException
 import com.example.opensonggoogletvviewer.network.OpenSongHttpClient
 import com.example.opensonggoogletvviewer.network.OpenSongWsClient
 import com.example.opensonggoogletvviewer.parser.OpenSongSlideParser
@@ -27,24 +28,19 @@ class OpenSongRepository(
 
     private var lastFingerprint: String? = null
 
-    // coalesce refresh triggers instead of dropping them
     private val refreshing = AtomicBoolean(false)
     @Volatile private var refreshRequested: Boolean = false
 
     fun start() {
         _connection.value = ConnectionState.Connecting
 
-        // Connect WS first so we don't miss events between initial refresh and subscription.
         ws.connect(
             onPresentationEvent = { refresh() },
             onError = {
-                // WS is an optimization; don't force global Error state here.
-                // Just try to refresh via HTTP when possible.
                 refresh()
             }
         )
 
-        // initial load
         refresh()
     }
 
@@ -55,7 +51,6 @@ class OpenSongRepository(
     fun refresh() {
         refreshRequested = true
 
-        // ensure a single runner; it will loop if more refreshes were requested during an in-flight fetch
         if (!refreshing.compareAndSet(false, true)) return
 
         scope.launch {
@@ -75,7 +70,6 @@ class OpenSongRepository(
             val xml = http.getCurrentSlideXml()
             val parsed = OpenSongSlideParser.parseCurrentSlide(xml)
 
-            // More robust than title/body-only: any XML change updates fingerprint.
             val fingerprint = xml.hashCode().toString()
             if (fingerprint != lastFingerprint) {
                 lastFingerprint = fingerprint
@@ -83,6 +77,10 @@ class OpenSongRepository(
             }
 
             _connection.value = ConnectionState.Connected
+        } catch (e: NoPresentationRunningException) {
+            lastFingerprint = null
+            _slide.value = CurrentSlide()
+            _connection.value = ConnectionState.Idle
         } catch (t: Throwable) {
             _connection.value = ConnectionState.Error("HTTP: ${t.toUserMessage()}")
         }

@@ -2,33 +2,34 @@ package com.example.opensonggoogletvviewer
 
 import android.os.Build
 import android.os.Bundle
+import android.os.SystemClock
+import android.util.Log
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.annotation.RequiresApi
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.lifecycle.lifecycleScope
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface
-import com.example.opensonggoogletvviewer.data.OpenSongRepository
-import com.example.opensonggoogletvviewer.network.OpenSongHttpClient
-import com.example.opensonggoogletvviewer.network.OpenSongWsClient
-import com.example.opensonggoogletvviewer.ui.SlideScreen
+import com.example.opensonggoogletvviewer.ui.AppRootScreen
 import com.example.opensonggoogletvviewer.ui.theme.OpenSongGoogleTVViewerTheme
-import com.example.opensonggoogletvviewer.viewmodel.SlideViewModel
+import com.example.opensonggoogletvviewer.viewmodel.AppViewModel
 import okhttp3.OkHttpClient
 
 class MainActivity : ComponentActivity() {
 
-    // TODO: move to settings later
-    private val presetIp = "10.13.137.138"
     private val port = 8082
+    private lateinit var appVm: AppViewModel
+
+    private var lastBackPressMs = 0L
+    private val doubleTapWindowMs = 350L
 
     @RequiresApi(Build.VERSION_CODES.O)
     @OptIn(ExperimentalTvMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        Log.e("MainActivity", "onCreate() reached")
 
         val okHttpClient = OkHttpClient.Builder()
             .connectTimeout(java.time.Duration.ofMillis(800))
@@ -38,20 +39,30 @@ class MainActivity : ComponentActivity() {
             .retryOnConnectionFailure(true)
             .build()
 
-        val httpClient = OpenSongHttpClient(okHttpClient, presetIp, port)
-        val wsClient = OpenSongWsClient(okHttpClient, presetIp, port)
+        appVm = AppViewModel(okHttp = okHttpClient, port = port)
 
-        val repository = OpenSongRepository(
-            http = httpClient,
-            ws = wsClient,
-            scope = lifecycleScope
-        )
+        Log.e("MainActivity", "Calling appVm.startDiscovery()")
+        appVm.startDiscovery()
+
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                val now = SystemClock.uptimeMillis()
+
+                if (now - lastBackPressMs <= doubleTapWindowMs) {
+                    lastBackPressMs = 0L
+                    Log.e("MainActivity", "Double back detected, restarting discovery")
+                    appVm.startDiscovery()
+                    return
+                }
+
+                lastBackPressMs = now
+            }
+        })
 
         setContent {
             OpenSongGoogleTVViewerTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {
-                    val vm = remember { SlideViewModel(repository) }
-                    SlideScreen(vm)
+                    AppRootScreen(appVm)
                 }
             }
         }

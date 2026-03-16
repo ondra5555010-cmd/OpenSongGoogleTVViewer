@@ -2,8 +2,16 @@ package com.example.opensonggoogletvviewer.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.layout.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -11,7 +19,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.tv.material3.*
+import androidx.tv.material3.ExperimentalTvMaterial3Api
+import androidx.tv.material3.LocalContentColor
+import androidx.tv.material3.MaterialTheme
+import androidx.tv.material3.Surface
+import androidx.tv.material3.Text
 import com.example.opensonggoogletvviewer.model.ConnectionState
 import com.example.opensonggoogletvviewer.ui.tv.SlideColorScheme
 import com.example.opensonggoogletvviewer.ui.tv.handleDpad
@@ -76,10 +88,11 @@ fun SlideScreen(vm: SlideViewModel) {
                         .padding(32.dp)
                 ) {
                     Text(
-                        text = when (conn) {
+                        text = when (val state = conn) {
                             is ConnectionState.Connecting -> "Connecting…"
                             is ConnectionState.Connected -> "Connected"
-                            is ConnectionState.Error -> "Error: ${(conn as ConnectionState.Error).message}"
+                            is ConnectionState.Idle -> "Connected — no presentation running"
+                            is ConnectionState.Error -> "Error: ${state.message}"
                         },
                         style = MaterialTheme.typography.bodyLarge.scaled(scale)
                     )

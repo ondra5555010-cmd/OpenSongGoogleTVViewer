@@ -27,14 +27,18 @@ import androidx.tv.material3.Text
 import com.example.opensonggoogletvviewer.model.ConnectionState
 import com.example.opensonggoogletvviewer.ui.tv.SlideColorScheme
 import com.example.opensonggoogletvviewer.ui.tv.handleDpad
-import com.example.opensonggoogletvviewer.ui.tv.rememberColorSchemeController
 import com.example.opensonggoogletvviewer.ui.tv.rememberFontScaleController
 import com.example.opensonggoogletvviewer.ui.tv.scaled
 import com.example.opensonggoogletvviewer.viewmodel.SlideViewModel
 
 @OptIn(ExperimentalTvMaterial3Api::class)
 @Composable
-fun SlideScreen(vm: SlideViewModel) {
+fun SlideScreen(
+    vm: SlideViewModel,
+    colorScheme: SlideColorScheme,
+    onLeft: () -> Unit,
+    onRight: () -> Unit
+) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
     DisposableEffect(lifecycleOwner) {
@@ -55,12 +59,11 @@ fun SlideScreen(vm: SlideViewModel) {
     val font = rememberFontScaleController()
     val scale = font.scale
 
-    val scheme = rememberColorSchemeController()
-    val backgroundColor = when (scheme.scheme) {
+    val backgroundColor = when (colorScheme) {
         SlideColorScheme.Dark -> Color.Black
         SlideColorScheme.Light -> Color.White
     }
-    val textColor = when (scheme.scheme) {
+    val textColor = when (colorScheme) {
         SlideColorScheme.Dark -> Color.White
         SlideColorScheme.Light -> Color.Black
     }
@@ -71,8 +74,8 @@ fun SlideScreen(vm: SlideViewModel) {
             .handleDpad(
                 onUp = { font.increase() },
                 onDown = { font.decrease() },
-                onLeft = { scheme.previous() },
-                onRight = { scheme.next() }
+                onLeft = onLeft,
+                onRight = onRight
             )
             .focusable()
     ) {

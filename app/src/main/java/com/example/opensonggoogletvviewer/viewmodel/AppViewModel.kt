@@ -4,12 +4,15 @@ import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.opensonggoogletvviewer.data.OpenSongRepository
+import com.example.opensonggoogletvviewer.data.UiSettingsStore
 import com.example.opensonggoogletvviewer.network.OpenSongDiscovery
 import com.example.opensonggoogletvviewer.network.OpenSongHttpClient
 import com.example.opensonggoogletvviewer.network.OpenSongWsClient
+import com.example.opensonggoogletvviewer.ui.tv.SlideColorScheme
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import okhttp3.OkHttpClient
 
@@ -22,15 +25,18 @@ sealed class AppState {
 
 class AppViewModel(
     private val okHttp: OkHttpClient,
+    private val settingsStore: UiSettingsStore,
     private val port: Int = 8082,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow<AppState>(AppState.Discovering)
     val state: StateFlow<AppState> = _state
 
+    private val _colorScheme = MutableStateFlow(settingsStore.loadColorScheme())
+    val colorScheme = _colorScheme.asStateFlow()
+
     private var scanJob: Job? = null
 
-    // Slide VM is created only after host is chosen
     private var slideVm: SlideViewModel? = null
     fun slideViewModelOrNull(): SlideViewModel? = slideVm
 
@@ -73,8 +79,20 @@ class AppViewModel(
         startRunning(host)
     }
 
+    fun nextColorScheme() {
+        val next = when (_colorScheme.value) {
+            SlideColorScheme.Dark -> SlideColorScheme.Light
+            SlideColorScheme.Light -> SlideColorScheme.Dark
+        }
+        _colorScheme.value = next
+        settingsStore.saveColorScheme(next)
+    }
+
+    fun previousColorScheme() {
+        nextColorScheme()
+    }
+
     private fun startRunning(host: String) {
-        // build a new repo + slide VM for this host
         val http = OpenSongHttpClient(okHttp, host, port)
         val ws = OpenSongWsClient(okHttp, host, port)
 

@@ -1,8 +1,8 @@
 package com.example.opensonggoogletvviewer
 
+import android.content.Context
 import android.os.Build
 import android.os.Bundle
-import android.os.SystemClock
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.OnBackPressedCallback
@@ -12,8 +12,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.Modifier
 import androidx.tv.material3.ExperimentalTvMaterial3Api
 import androidx.tv.material3.Surface
+import com.example.opensonggoogletvviewer.data.UiSettingsStore
 import com.example.opensonggoogletvviewer.ui.AppRootScreen
 import com.example.opensonggoogletvviewer.ui.theme.OpenSongGoogleTVViewerTheme
+import com.example.opensonggoogletvviewer.viewmodel.AppState
 import com.example.opensonggoogletvviewer.viewmodel.AppViewModel
 import okhttp3.OkHttpClient
 
@@ -21,9 +23,6 @@ class MainActivity : ComponentActivity() {
 
     private val port = 8082
     private lateinit var appVm: AppViewModel
-
-    private var lastBackPressMs = 0L
-    private val doubleTapWindowMs = 350L
 
     @RequiresApi(Build.VERSION_CODES.O)
     @OptIn(ExperimentalTvMaterial3Api::class)
@@ -39,23 +38,32 @@ class MainActivity : ComponentActivity() {
             .retryOnConnectionFailure(true)
             .build()
 
-        appVm = AppViewModel(okHttp = okHttpClient, port = port)
+        val settingsStore = UiSettingsStore(
+            getSharedPreferences("opensong_viewer_prefs", Context.MODE_PRIVATE)
+        )
+
+        appVm = AppViewModel(
+            okHttp = okHttpClient,
+            settingsStore = settingsStore,
+            port = port
+        )
 
         Log.e("MainActivity", "Calling appVm.startDiscovery()")
         appVm.startDiscovery()
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                val now = SystemClock.uptimeMillis()
-
-                if (now - lastBackPressMs <= doubleTapWindowMs) {
-                    lastBackPressMs = 0L
-                    Log.e("MainActivity", "Double back detected, restarting discovery")
-                    appVm.startDiscovery()
-                    return
+                when (appVm.state.value) {
+                    is AppState.Running,
+                    is AppState.PickServer,
+                    is AppState.DiscoveryError -> {
+                        Log.e("MainActivity", "Back pressed, restarting discovery")
+                        appVm.startDiscovery()
+                    }
+                    is AppState.Discovering -> {
+                        // ignore
+                    }
                 }
-
-                lastBackPressMs = now
             }
         })
 

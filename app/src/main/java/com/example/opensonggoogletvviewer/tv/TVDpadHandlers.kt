@@ -7,7 +7,7 @@ import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
 
 /**
- * Reusable DPAD handler. Returns true when the key was consumed.
+ * Reusable TV remote handler. Returns true when the key was consumed.
  */
 fun Modifier.handleDpad(
     onUp: (() -> Unit)? = null,
@@ -15,6 +15,7 @@ fun Modifier.handleDpad(
     onLeft: (() -> Unit)? = null,
     onRight: (() -> Unit)? = null,
     onCenter: (() -> Unit)? = null,
+    onMenu: (() -> Unit)? = null,
 ): Modifier = this.onKeyEvent { e ->
     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
 
@@ -23,8 +24,16 @@ fun Modifier.handleDpad(
         KeyEvent.KEYCODE_DPAD_DOWN -> onDown?.let { it(); true } ?: false
         KeyEvent.KEYCODE_DPAD_LEFT -> onLeft?.let { it(); true } ?: false
         KeyEvent.KEYCODE_DPAD_RIGHT -> onRight?.let { it(); true } ?: false
+
         KeyEvent.KEYCODE_DPAD_CENTER,
         KeyEvent.KEYCODE_ENTER -> onCenter?.let { it(); true } ?: false
+
+        KeyEvent.KEYCODE_MENU,
+        KeyEvent.KEYCODE_SETTINGS -> onMenu?.let {
+            it()
+            true
+        } ?: false
+
         else -> false
     }
 }

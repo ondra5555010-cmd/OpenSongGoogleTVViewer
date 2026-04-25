@@ -65,6 +65,28 @@ class OpenSongRepository(
         }
     }
 
+    fun nextSlide() {
+        scope.launch {
+            try {
+                http.nextSlide()
+                refresh()
+            } catch (_: Throwable) {
+                refresh()
+            }
+        }
+    }
+
+    fun previousSlide() {
+        scope.launch {
+            try {
+                http.previousSlide()
+                refresh()
+            } catch (_: Throwable) {
+                refresh()
+            }
+        }
+    }
+
     private suspend fun performRefreshOnce() {
         try {
             val xml = http.getCurrentSlideXml()

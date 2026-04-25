@@ -16,6 +16,9 @@ class SlideViewModel(
     fun start() = repo.start()
     fun stop() = repo.stop()
 
+    fun nextSlide() = repo.nextSlide()
+    fun previousSlide() = repo.previousSlide()
+
     override fun onCleared() {
         repo.stop()
         super.onCleared()

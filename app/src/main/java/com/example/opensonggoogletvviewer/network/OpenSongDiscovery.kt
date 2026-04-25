@@ -21,7 +21,10 @@ object OpenSongDiscovery {
 
     private const val TAG = "OpenSongDiscovery"
 
-    data class Found(val ip: String)
+    data class Found(
+        val ip: String,
+        val label: String
+    )
 
     @RequiresApi(Build.VERSION_CODES.O)
     suspend fun discoverOnLocal24(
@@ -59,7 +62,8 @@ object OpenSongDiscovery {
                         }
 
                         Log.d(TAG, "OpenSong confirmed on $ip")
-                        Found(ip)
+                        val label = resolveHostName(ip)?.let { "$it ($ip)" } ?: ip
+                        Found(ip = ip, label = label)
                     }
                 }
             }
@@ -199,6 +203,17 @@ object OpenSongDiscovery {
                 .firstOrNull()
         } catch (t: Throwable) {
             Log.d(TAG, "getLocalIpv4() failed: ${t.message}")
+            null
+        }
+    }
+
+    private fun resolveHostName(ip: String): String? {
+        return try {
+            val addr = java.net.InetAddress.getByName(ip)
+            val name = addr.canonicalHostName
+
+            if (name.isBlank() || name == ip) null else name
+        } catch (_: Exception) {
             null
         }
     }

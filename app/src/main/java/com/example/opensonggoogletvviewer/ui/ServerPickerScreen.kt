@@ -20,18 +20,18 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
+import com.example.opensonggoogletvviewer.network.OpenSongDiscovery
 import com.example.opensonggoogletvviewer.ui.tv.SlideColorScheme
 import com.example.opensonggoogletvviewer.ui.tv.handleDpad
 
 @Composable
 fun ServerPickerScreen(
-    ips: List<String>,
+    servers: List<OpenSongDiscovery.Found>,
     selectedIndex: Int,
     colorScheme: SlideColorScheme,
+    colorRowSelected: Boolean,
     onUp: () -> Unit,
     onDown: () -> Unit,
-    onLeft: () -> Unit,
-    onRight: () -> Unit,
     onOk: () -> Unit,
 ) {
     val focusRequester = FocusRequester()
@@ -59,8 +59,6 @@ fun ServerPickerScreen(
             .handleDpad(
                 onUp = onUp,
                 onDown = onDown,
-                onLeft = onLeft,
-                onRight = onRight,
                 onCenter = onOk
             )
             .padding(48.dp),
@@ -76,7 +74,25 @@ fun ServerPickerScreen(
 
             Spacer(Modifier.height(24.dp))
 
-            if (ips.isEmpty()) {
+            val colorPrefix = if (colorRowSelected) "➤ " else "  "
+
+            Text(
+                text = colorPrefix + "Color scheme: ${colorScheme.name}",
+                style = style,
+                color = textColor
+            )
+
+            Spacer(Modifier.height(24.dp))
+
+            Text(
+                text = "PICKABLE SERVERS:",
+                style = style.copy(fontSize = 22.sp),
+                color = textColor
+            )
+
+            Spacer(Modifier.height(16.dp))
+
+            if (servers.isEmpty()) {
                 Text(
                     text = "No servers found.",
                     style = style,
@@ -84,13 +100,14 @@ fun ServerPickerScreen(
                 )
             } else {
                 val start = (selectedIndex - 6).coerceAtLeast(0)
-                val end = (start + 12).coerceAtMost(ips.size)
+                val end = (start + 12).coerceAtMost(servers.size)
 
                 for (i in start until end) {
-                    val prefix = if (i == selectedIndex) "➤ " else "  "
+                    val prefix =
+                        if (!colorRowSelected && i == selectedIndex) "➤ " else "  "
 
                     Text(
-                        text = prefix + ips[i],
+                        text = prefix + servers[i].label,
                         style = style,
                         color = textColor
                     )

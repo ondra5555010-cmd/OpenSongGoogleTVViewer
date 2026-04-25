@@ -31,13 +31,12 @@ fun AppRootScreen(appVm: AppViewModel) {
 
         is AppState.PickServer -> {
             ServerPickerScreen(
-                ips = s.results,
+                servers = s.results,
                 selectedIndex = s.selectedIndex,
                 colorScheme = colorScheme,
+                colorRowSelected = s.colorRowSelected,
                 onUp = { appVm.moveSelection(-1) },
                 onDown = { appVm.moveSelection(+1) },
-                onLeft = { appVm.previousColorScheme() },
-                onRight = { appVm.nextColorScheme() },
                 onOk = { appVm.chooseSelected() }
             )
         }
@@ -48,8 +47,7 @@ fun AppRootScreen(appVm: AppViewModel) {
                 SlideScreen(
                     vm = slideVm,
                     colorScheme = colorScheme,
-                    onLeft = { appVm.previousColorScheme() },
-                    onRight = { appVm.nextColorScheme() }
+                    onSettings = { appVm.toggleColorScheme() }
                 )
             } else {
                 Box(modifier = Modifier.fillMaxSize())

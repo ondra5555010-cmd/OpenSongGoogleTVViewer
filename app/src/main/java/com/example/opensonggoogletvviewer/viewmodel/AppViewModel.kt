@@ -18,7 +18,11 @@ import okhttp3.OkHttpClient
 
 sealed class AppState {
     data object Discovering : AppState()
-    data class PickServer(val results: List<String>, val selectedIndex: Int) : AppState()
+    data class PickServer(
+        val results: List<OpenSongDiscovery.Found>,
+        val selectedIndex: Int,
+        val colorRowSelected: Boolean = true
+    ) : AppState()
     data class Running(val host: String) : AppState()
     data class DiscoveryError(val message: String) : AppState()
 }
@@ -55,7 +59,7 @@ class AppViewModel(
                     port = port,
                     concurrency = 200
                 )
-                val ips = found.map { it.ip }
+                val ips = found
                 _state.value = AppState.PickServer(results = ips, selectedIndex = 0)
             } catch (t: Throwable) {
                 _state.value = AppState.DiscoveryError(t.message ?: "Discovery failed")
@@ -66,30 +70,46 @@ class AppViewModel(
     fun moveSelection(delta: Int) {
         val s = _state.value
         if (s !is AppState.PickServer) return
-        if (s.results.isEmpty()) return
 
-        val newIndex = (s.selectedIndex + delta).coerceIn(0, s.results.lastIndex)
+        if (s.colorRowSelected) {
+            if (delta > 0 && s.results.isNotEmpty()) {
+                _state.value = s.copy(colorRowSelected = false)
+            }
+            return
+        }
+
+        val newIndex = (s.selectedIndex + delta)
+            .coerceIn(0, s.results.lastIndex)
+
+        if (delta < 0 && newIndex == 0) {
+            _state.value = s.copy(colorRowSelected = true)
+            return
+        }
+
         _state.value = s.copy(selectedIndex = newIndex)
     }
 
     fun chooseSelected() {
         val s = _state.value
         if (s !is AppState.PickServer) return
-        val host = s.results.getOrNull(s.selectedIndex) ?: return
+
+        if (s.colorRowSelected) {
+            toggleColorScheme()
+            return
+        }
+
+        val host = s.results.getOrNull(s.selectedIndex)?.ip ?: return
         startRunning(host)
     }
 
-    fun nextColorScheme() {
+    fun toggleColorScheme() {
         val next = when (_colorScheme.value) {
             SlideColorScheme.Dark -> SlideColorScheme.Light
             SlideColorScheme.Light -> SlideColorScheme.Dark
         }
+
         _colorScheme.value = next
         settingsStore.saveColorScheme(next)
-    }
-
-    fun previousColorScheme() {
-        nextColorScheme()
     }
 
     private fun startRunning(host: String) {

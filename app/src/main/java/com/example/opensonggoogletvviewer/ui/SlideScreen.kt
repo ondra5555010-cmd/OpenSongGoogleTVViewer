@@ -36,8 +36,7 @@ import com.example.opensonggoogletvviewer.viewmodel.SlideViewModel
 fun SlideScreen(
     vm: SlideViewModel,
     colorScheme: SlideColorScheme,
-    onLeft: () -> Unit,
-    onRight: () -> Unit
+    onSettings: () -> Unit
 ) {
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -74,9 +73,10 @@ fun SlideScreen(
             .handleDpad(
                 onUp = { font.increase() },
                 onDown = { font.decrease() },
-                onLeft = onLeft,
-                onRight = onRight
+                onLeft = { vm.previousSlide() },
+                onRight = { vm.nextSlide() }
             )
+
             .focusable()
     ) {
         CompositionLocalProvider(LocalContentColor provides textColor) {

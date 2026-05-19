@@ -7,8 +7,11 @@ import com.example.opensonggoogletvviewer.network.OpenSongHttpClient
 import com.example.opensonggoogletvviewer.network.OpenSongWsClient
 import com.example.opensonggoogletvviewer.parser.OpenSongSlideParser
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.net.ConnectException
 import java.net.SocketTimeoutException
@@ -18,6 +21,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class OpenSongRepository(
     private val http: OpenSongHttpClient,
     private val ws: OpenSongWsClient,
+    private val refreshIntervalMs: Long,
     private val scope: CoroutineScope
 ) {
     private val _slide = MutableStateFlow(CurrentSlide())
@@ -27,6 +31,8 @@ class OpenSongRepository(
     val connection: StateFlow<ConnectionState> = _connection
 
     private var lastFingerprint: String? = null
+    private var consecutiveRefreshFailures: Int = 0
+    private var pollingJob: Job? = null
 
     private val refreshing = AtomicBoolean(false)
     @Volatile private var refreshRequested: Boolean = false
@@ -42,9 +48,12 @@ class OpenSongRepository(
         )
 
         refresh()
+        startPolling()
     }
 
     fun stop() {
+        pollingJob?.cancel()
+        pollingJob = null
         ws.close()
     }
 
@@ -87,24 +96,50 @@ class OpenSongRepository(
         }
     }
 
-    private suspend fun performRefreshOnce() {
+    private fun acceptSlideXml(xml: String) {
         try {
-            val xml = http.getCurrentSlideXml()
             val parsed = OpenSongSlideParser.parseCurrentSlide(xml)
-
             val fingerprint = xml.hashCode().toString()
             if (fingerprint != lastFingerprint) {
                 lastFingerprint = fingerprint
                 _slide.value = parsed
             }
-
+            consecutiveRefreshFailures = 0
             _connection.value = ConnectionState.Connected
+        } catch (_: Throwable) {
+            refresh()
+        }
+    }
+
+    private fun startPolling() {
+        pollingJob?.cancel()
+        pollingJob = scope.launch {
+            while (isActive) {
+                delay(refreshIntervalMs)
+                refresh()
+            }
+        }
+    }
+
+    private suspend fun performRefreshOnce() {
+        try {
+            val xml = http.getCurrentSlideXml()
+            acceptSlideXml(xml)
         } catch (e: NoPresentationRunningException) {
             lastFingerprint = null
+            consecutiveRefreshFailures = 0
             _slide.value = CurrentSlide()
             _connection.value = ConnectionState.Idle
         } catch (t: Throwable) {
-            _connection.value = ConnectionState.Error("HTTP: ${t.toUserMessage()}")
+            val hasPreviousSlide =
+                !_slide.value.title.isNullOrBlank() || !_slide.value.body.isNullOrBlank()
+
+            consecutiveRefreshFailures++
+            if (hasPreviousSlide && consecutiveRefreshFailures < 3) {
+                _connection.value = ConnectionState.Connected
+            } else {
+                _connection.value = ConnectionState.Error("HTTP: ${t.toUserMessage()}")
+            }
         }
     }
 }

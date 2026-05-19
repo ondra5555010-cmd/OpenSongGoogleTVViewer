@@ -31,9 +31,9 @@ class MainActivity : ComponentActivity() {
         Log.e("MainActivity", "onCreate() reached")
 
         val okHttpClient = OkHttpClient.Builder()
-            .connectTimeout(java.time.Duration.ofMillis(800))
-            .readTimeout(java.time.Duration.ofSeconds(2))
-            .callTimeout(java.time.Duration.ofSeconds(2))
+            .connectTimeout(java.time.Duration.ofMillis(500))
+            .readTimeout(java.time.Duration.ofMillis(800))
+            .callTimeout(java.time.Duration.ofMillis(900))
             .pingInterval(java.time.Duration.ofSeconds(15))
             .retryOnConnectionFailure(true)
             .build()
@@ -48,20 +48,15 @@ class MainActivity : ComponentActivity() {
             port = port
         )
 
-        Log.e("MainActivity", "Calling appVm.startDiscovery()")
-        appVm.startDiscovery()
-
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
                 when (appVm.state.value) {
                     is AppState.Running,
                     is AppState.PickServer,
-                    is AppState.DiscoveryError -> {
-                        Log.e("MainActivity", "Back pressed, restarting discovery")
-                        appVm.startDiscovery()
-                    }
+                    is AppState.DiscoveryError,
                     is AppState.Discovering -> {
-                        // ignore
+                        Log.e("MainActivity", "Back pressed, returning to main menu")
+                        appVm.showMainMenu()
                     }
                 }
             }

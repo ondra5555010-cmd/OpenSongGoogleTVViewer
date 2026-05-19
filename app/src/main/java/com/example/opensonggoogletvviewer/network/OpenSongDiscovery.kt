@@ -23,13 +23,14 @@ object OpenSongDiscovery {
 
     data class Found(
         val ip: String,
+        val port: Int,
         val label: String
     )
 
     @RequiresApi(Build.VERSION_CODES.O)
     suspend fun discoverOnLocal24(
         okHttp: OkHttpClient,
-        port: Int = 8082,
+        ports: List<Int> = listOf(8082, 8080),
         concurrency: Int = 200,
         connectTimeoutMs: Int = 250,
         verifyTimeoutMs: Int = 1200,
@@ -43,14 +44,17 @@ object OpenSongDiscovery {
 
         Log.d(TAG, "Local IP = $localIp")
 
-        val candidates = buildCandidateIps(localIp)
+        val emulator = isProbablyAndroidEmulator(localIp)
+        val candidates = buildCandidateIps(localIp, emulator)
         Log.d(TAG, "Candidate count = ${candidates.size}")
+        Log.d(TAG, "Emulator mode = $emulator")
         Log.d(TAG, "Candidates include emulator aliases = ${candidates.any { it == "10.0.2.2" || it == "10.0.3.2" }}")
 
         val semaphore = Semaphore(concurrency)
 
         coroutineScope {
-            val jobs = candidates.map { ip ->
+            val jobs = candidates.flatMap { ip ->
+                ports.map { port ->
                 async {
                     semaphore.withPermit {
                         if (!isPortOpen(ip, port, connectTimeoutMs)) return@withPermit null
@@ -61,17 +65,23 @@ object OpenSongDiscovery {
                             return@withPermit null
                         }
 
-                        Log.d(TAG, "OpenSong confirmed on $ip")
-                        val label = resolveHostName(ip)?.let { "$it ($ip)" } ?: ip
-                        Found(ip = ip, label = label)
+                        Log.d(TAG, "OpenSong confirmed on $ip:$port")
+                        val hostLabel = resolveHostName(ip)?.let { "$it ($ip)" } ?: ip
+                        val appLabel = when (port) {
+                            8080 -> "OpenSongApp"
+                            8082 -> "OpenSong"
+                            else -> "OpenSong"
+                        }
+                        Found(ip = ip, port = port, label = "$hostLabel - $appLabel")
                     }
+                }
                 }
             }
 
             val results = jobs.awaitAll()
                 .filterNotNull()
-                .distinctBy { it.ip }
-                .sortedBy { it.ip }
+                .distinctBy { "${it.ip}:${it.port}" }
+                .sortedWith(compareBy({ it.ip }, { it.port }))
 
             Log.d(TAG, "Discovery finished, found ${results.size} host(s)")
             results
@@ -89,7 +99,7 @@ object OpenSongDiscovery {
      * This does NOT magically enumerate the host PC's LAN subnet from inside the emulator.
      * It simply adds the known emulator host aliases, which is the useful part for local testing.
      */
-    private fun buildCandidateIps(localIp: String): List<String> {
+    private fun buildCandidateIps(localIp: String, emulator: Boolean): List<String> {
         val result = linkedSetOf<String>()
 
         val prefix = localIp.substringBeforeLast('.', missingDelimiterValue = "")
@@ -101,7 +111,7 @@ object OpenSongDiscovery {
             Log.d(TAG, "Scanning local prefix = $prefix.x")
         }
 
-        if (isProbablyAndroidEmulatorSubnet(localIp)) {
+        if (emulator) {
             result += "10.0.2.2"
             result += "10.0.3.2"
             Log.d(TAG, "Emulator subnet detected, added host aliases 10.0.2.2 and 10.0.3.2")
@@ -110,8 +120,17 @@ object OpenSongDiscovery {
         return result.toList()
     }
 
-    private fun isProbablyAndroidEmulatorSubnet(localIp: String): Boolean {
-        return localIp.startsWith("10.0.2.") || localIp.startsWith("10.0.3.")
+    private fun isProbablyAndroidEmulator(localIp: String): Boolean {
+        return localIp.startsWith("10.0.2.") ||
+                localIp.startsWith("10.0.3.") ||
+                Build.FINGERPRINT.startsWith("generic") ||
+                Build.FINGERPRINT.startsWith("unknown") ||
+                Build.MODEL.contains("google_sdk", ignoreCase = true) ||
+                Build.MODEL.contains("Emulator", ignoreCase = true) ||
+                Build.MODEL.contains("Android SDK built for x86", ignoreCase = true) ||
+                Build.MANUFACTURER.contains("Genymotion", ignoreCase = true) ||
+                Build.BRAND.startsWith("generic") && Build.DEVICE.startsWith("generic") ||
+                Build.PRODUCT == "google_sdk"
     }
 
     private fun isPortOpen(ip: String, port: Int, timeoutMs: Int): Boolean {

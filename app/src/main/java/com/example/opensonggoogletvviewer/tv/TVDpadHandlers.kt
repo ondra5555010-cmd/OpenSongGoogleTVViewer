@@ -16,6 +16,7 @@ fun Modifier.handleDpad(
     onRight: (() -> Unit)? = null,
     onCenter: (() -> Unit)? = null,
     onMenu: (() -> Unit)? = null,
+    onBack: (() -> Unit)? = null,
 ): Modifier = this.onKeyEvent { e ->
     if (e.type != KeyEventType.KeyDown) return@onKeyEvent false
 
@@ -30,6 +31,12 @@ fun Modifier.handleDpad(
 
         KeyEvent.KEYCODE_MENU,
         KeyEvent.KEYCODE_SETTINGS -> onMenu?.let {
+            it()
+            true
+        } ?: false
+
+        KeyEvent.KEYCODE_BACK,
+        KeyEvent.KEYCODE_ESCAPE -> onBack?.let {
             it()
             true
         } ?: false

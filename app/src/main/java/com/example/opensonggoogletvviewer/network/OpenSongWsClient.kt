@@ -47,9 +47,6 @@ class OpenSongWsClient(
 
                 // OpenSong subscribe
                 webSocket.send("/ws/subscribe/presentation")
-
-                // Refresh immediately after subscribing
-                onPresentationEvent()
             }
 
             override fun onMessage(webSocket: WebSocket, text: String) {

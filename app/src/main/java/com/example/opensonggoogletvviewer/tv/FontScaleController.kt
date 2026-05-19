@@ -31,8 +31,16 @@ fun rememberFontScaleController(
  * Scales a TextStyle proportionally (font size + line height + letter spacing).
  * Useful for multi-line lyrics on TV.
  */
-fun TextStyle.scaled(scale: Float): TextStyle = this.copy(
-    fontSize = this.fontSize * scale,
-    lineHeight = this.lineHeight * scale,
-    letterSpacing = this.letterSpacing * scale
-)
+fun TextStyle.scaled(scale: Float): TextStyle {
+    val lineHeightScale = if (scale > 1.0f) {
+        1.0f + ((scale - 1.0f) * 0.85f)
+    } else {
+        scale
+    }
+
+    return this.copy(
+        fontSize = this.fontSize * scale,
+        lineHeight = this.lineHeight * lineHeightScale,
+        letterSpacing = this.letterSpacing
+    )
+}

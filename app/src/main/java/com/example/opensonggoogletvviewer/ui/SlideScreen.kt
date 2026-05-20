@@ -31,6 +31,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Surface
 import androidx.tv.material3.Text
 import com.example.opensonggoogletvviewer.model.AppStrings
+import com.example.opensonggoogletvviewer.model.SlideDisplayMode
 import com.example.opensonggoogletvviewer.model.ConnectionState
 import com.example.opensonggoogletvviewer.ui.tv.SlideColorScheme
 import com.example.opensonggoogletvviewer.ui.tv.handleDpad
@@ -73,13 +74,17 @@ fun SlideScreen(
     val conn by vm.connection.collectAsStateWithLifecycle()
     val body = slide.body.orEmpty()
 
-    val backgroundColor = when (colorScheme) {
-        SlideColorScheme.Dark -> Color(0xFF000000)
-        SlideColorScheme.Light -> Color(0xFFFAFAF5)
+    val forceBlackScreen = slide.displayMode == SlideDisplayMode.Black
+
+    val backgroundColor = when {
+        forceBlackScreen -> Color.Black
+        colorScheme == SlideColorScheme.Dark -> Color(0xFF000000)
+        else -> Color(0xFFFAFAF5)
     }
-    val textColor = when (colorScheme) {
-        SlideColorScheme.Dark -> Color.White
-        SlideColorScheme.Light -> Color(0xFF111111)
+    val textColor = when {
+        forceBlackScreen -> Color.White
+        colorScheme == SlideColorScheme.Dark -> Color.White
+        else -> Color(0xFF111111)
     }
     val mutedTextColor = textColor.copy(alpha = 0.58f)
 
@@ -115,13 +120,15 @@ fun SlideScreen(
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text(
-                        modifier = Modifier.fillMaxWidth(),
-                        text = body,
-                        color = textColor,
-                        textAlign = TextAlign.Center,
-                        style = MaterialTheme.typography.displaySmall.scaled(fontScale)
-                    )
+                    if (!forceBlackScreen) {
+                        Text(
+                            modifier = Modifier.fillMaxWidth(),
+                            text = body,
+                            color = textColor,
+                            textAlign = TextAlign.Center,
+                            style = MaterialTheme.typography.displaySmall.scaled(fontScale)
+                        )
+                    }
                 }
             }
         }

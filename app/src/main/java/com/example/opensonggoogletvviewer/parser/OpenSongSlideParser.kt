@@ -1,6 +1,7 @@
 package com.example.opensonggoogletvviewer.parser
 
 import com.example.opensonggoogletvviewer.model.CurrentSlide
+import com.example.opensonggoogletvviewer.model.SlideDisplayMode
 import org.xmlpull.v1.XmlPullParser
 import org.xmlpull.v1.XmlPullParserFactory
 import java.io.StringReader
@@ -19,6 +20,7 @@ object OpenSongSlideParser {
 
         var title: String? = null
         var body: String? = null
+        var displayMode = SlideDisplayMode.Normal
 
         while (true) {
             when (parser.eventType) {
@@ -39,6 +41,11 @@ object OpenSongSlideParser {
                         when (currentTag) {
                             "title" -> if (title == null) title = text.trim().takeIf { it.isNotEmpty() }
                             "body" -> if (body == null) body = text.trim().takeIf { it.isNotEmpty() }
+                            "display" -> displayMode = when (text.trim().lowercase()) {
+                                "black" -> SlideDisplayMode.Black
+                                "blank" -> SlideDisplayMode.Blank
+                                else -> SlideDisplayMode.Normal
+                            }
                         }
                     }
                 }
@@ -56,6 +63,6 @@ object OpenSongSlideParser {
             parser.next()
         }
 
-        return CurrentSlide(title = title, body = body)
+        return CurrentSlide(title = title, body = body, displayMode = displayMode)
     }
 }

@@ -1,2 +1,2 @@
 # OpenSongGoogleTVViewer
-Diplomla
+Diplomka
